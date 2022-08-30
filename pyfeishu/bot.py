@@ -1,10 +1,19 @@
-from datetime import timedelta
+# -*- coding:utf-8 -*-
+"""
+====================================
+@File    :  bot.py
+@Author  :  LiuKe
+====================================
+"""
 
+from datetime import timedelta
+import json
 from cachetools import TTLCache, keys
 from requests import Request, Session
+from requests_toolbelt import MultipartEncoder
 from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
-from .errors import RequestError, TokenExpiredError,NoPermissionError
+from .errors import NoPermissionError, RequestError, TokenExpiredError
 from .log import logger
 
 
@@ -21,19 +30,11 @@ class FeishuBot:
     @retry(stop=stop_after_attempt(3),
            wait=wait_fixed(1),
            retry=retry_if_exception_type(TokenExpiredError))
-    def http_client(self, method, endpoint, *args, **kwargs):
+    def http_client(self, method, endpoint, headers, *args, **kwargs):
         url = f'{self.base_url}{endpoint}'
-        no_auth = kwargs.pop('no_auth', False)
-        if no_auth:
-            headers = kwargs.pop('headers', {})
-        else:
-            token = self.get_access_token()
-            headers = {
-                'Authorization': f'Bearer {token}',
-                **kwargs.pop('headers', {})
-            }
+
         s = Session()
-        req = Request(method, url, *args, headers=headers, **kwargs)
+        req = Request(method, url, headers=headers, *args, **kwargs)
         prepped = s.prepare_request(req)
         resp = s.send(prepped)
         resp_json = resp.json()
@@ -53,11 +54,11 @@ class FeishuBot:
 
         return resp_json
 
-    def get(self, endpoint, *args, **kwargs):
-        return self.http_client('GET', endpoint, *args, **kwargs)
+    def get(self, endpoint, headers=None, *args, **kwargs):
+        return self.http_client('GET', endpoint, headers, *args, **kwargs)
 
-    def post(self, endpoint, *args, **kwargs):
-        return self.http_client('POST', endpoint, *args, **kwargs)
+    def post(self, endpoint, headers=None, *args, **kwargs):
+        return self.http_client('POST', endpoint, headers, *args, **kwargs)
 
     def get_access_token(self):
         cached_token = self.token_cache.get(keys.hashkey(self))
@@ -65,7 +66,6 @@ class FeishuBot:
             return cached_token
         url = f'/auth/v3/tenant_access_token/internal/'
         resp = self.post(url,
-                         no_auth=True,
                          json={
                                 'app_id': self.app_id,
                                 'app_secret': self.app_secret
@@ -75,66 +75,42 @@ class FeishuBot:
 
         return token
 
-    def get_groups(self):
-        resp = self.get('/chat/v4/list')
-        return resp['data']['groups']
+    def get_group(self):
+        url = f'/im/v1/chats'
+        token = self.get_access_token()
+        headers = {
+            'Authorization': f'Bearer {token}',
+        }
+        resp = self.get(url,headers=headers)
+        return resp
 
-    def send_to_groups(self, msg_type, content=None, card=None, **kwargs):
-        groups = kwargs.get('groups')
-        if groups is None:
-            detailed_groups = self.get_groups()
-            groups = [g['chat_id'] for g in detailed_groups]
-        elif isinstance(groups, str):
-            # single chat_id
-            groups = [groups]
-        result = []
-        for g in groups:
-            payload = {
-                'chat_id': g,
-                'msg_type': msg_type,
-            }
-            if card is not None:
-                payload['card'] = card
-                payload['update_multi'] = kwargs['is_shared']
-            else:
-                payload['content'] = content
-            res = self.post('/message/v4/send/', json=payload)
-            result.append(res)
-
-        logger.debug(f'Sent {msg_type}={content} to {[g for g in groups]}')
-
-        return result
-
-    def send_text(self, text: str, groups=None):
-        """
-        Send plain text
-        """
-        return self.send_to_groups('text', {'text': text}, groups=groups)
 
     def upload_image(self, img):
-        """
-        Upload image of the given url
-        """
-        # files = [('image',('tu.png',open('tup.png','rb'))),]
-        b = open(img,'rb')
-        resp = self.post('/im/v1/images',
-                        data={
-                            'image_type': 'message',
-                            'image': b})
-        print("0"*100)
+        url = "https://open.feishu.cn/open-apis/im/v1/images"
+        form = {'image_type': 'message', 'image': (open(img, 'rb'))} 
+        multi_form = MultipartEncoder(form)
+        token = self.get_access_token()
+        headers = {
+            'Authorization': f'Bearer {token}',
+        }
+        headers['Content-Type'] = multi_form.content_type
+        resp = self.post('/im/v1/images', headers=headers, data=multi_form)
         print(resp['code'])
         image_key = resp['data']['image_key']
         logger.debug(f'uploaded image: url={img} image_key={image_key}')
         return image_key
 
-    def send_image(self, img, groups=None):
-        """
-        Send image
-        """
-        image_key = self.upload_image(img)
-        return self.send_to_groups('image', {'image_key': image_key}, groups=groups)
-
-
-
-if __name__ == '__main__':
-    pass
+    def send_msg(self, msg, recv_id, type='text', recv_id_type='chat_id'):
+        token = self.get_access_token()
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json; charset=utf-8',
+        }
+        params = {"receive_id_type": recv_id_type}
+        payload = {
+            "receive_id": recv_id,
+            "content": json.dumps(msg),
+            "msg_type": type,
+        }
+        return self.post('/im/v1/messages',headers=headers,params=params,json=payload)
+    
