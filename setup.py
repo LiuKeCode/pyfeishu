@@ -4,7 +4,7 @@
 ====================================
 @File    :  setup.py
 @Time    :  2022/07/12 15:53:21
-@Author  :  LiuKeCode@hotmail.com
+@Author  :  LiuKeCode
 @Desc    :  None
 ====================================
 """
@@ -22,7 +22,7 @@ NAME = "PyFeishu"
 DESCRIPTION = (
     "This is a msg-robot for FeiShu."
 )
-AUTHOR = "PyFeishu"
+AUTHOR = "LiuKeCode"
 URL = "https://github.com/liukecode/pyfeishu"
 VERSION = None
 
@@ -48,7 +48,7 @@ setup(
     long_description_content_type="text/markdown",
     AUTHOR=AUTHOR,
     url=URL,
-    keywords=["feishu", "api", "boy", "robot"],
+    keywords=["feishu", "api", "bot", "robot", "sdk"],
     install_requires=[req for req in requirements],
     packages=find_packages(exclude=("tests",)),
     package_data = {'': ['*.yaml'],},

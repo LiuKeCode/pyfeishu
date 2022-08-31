@@ -26,6 +26,7 @@ class FeishuBot:
         self.app_secret = app_secret
         self.base_url = base_url
         self.token_cache = TTLCache(1, token_ttl or timedelta(minutes=100).seconds)
+        self.s = Session()
 
     @retry(stop=stop_after_attempt(3),
            wait=wait_fixed(1),
@@ -33,10 +34,9 @@ class FeishuBot:
     def http_client(self, method, endpoint, headers, *args, **kwargs):
         url = f'{self.base_url}{endpoint}'
 
-        s = Session()
         req = Request(method, url, headers=headers, *args, **kwargs)
-        prepped = s.prepare_request(req)
-        resp = s.send(prepped)
+        prepped = self.s.prepare_request(req)
+        resp = self.s.send(prepped)
         resp_json = resp.json()
         code = resp_json['code']
         msg = resp_json['msg']
