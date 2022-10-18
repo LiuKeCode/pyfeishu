@@ -14,6 +14,7 @@ class TokenExpiredError(RequestError):
     able to resolve this.
     """
 
+
 class NoPermissionError(RequestError):
     """
     Raised on No Permission

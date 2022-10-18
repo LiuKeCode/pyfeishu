@@ -67,9 +67,9 @@ class FeishuBot:
         url = f'/auth/v3/tenant_access_token/internal/'
         resp = self.post(url,
                          json={
-                                'app_id': self.app_id,
-                                'app_secret': self.app_secret
-                               })
+                             'app_id': self.app_id,
+                             'app_secret': self.app_secret
+                         })
         token = resp['tenant_access_token']
         self.token_cache[keys.hashkey(self)] = token
 
@@ -81,13 +81,12 @@ class FeishuBot:
         headers = {
             'Authorization': f'Bearer {token}',
         }
-        resp = self.get(url,headers=headers)
+        resp = self.get(url, headers=headers)
         return resp
-
 
     def upload_image(self, img):
         url = "https://open.feishu.cn/open-apis/im/v1/images"
-        form = {'image_type': 'message', 'image': (open(img, 'rb'))} 
+        form = {'image_type': 'message', 'image': (open(img, 'rb'))}
         multi_form = MultipartEncoder(form)
         token = self.get_access_token()
         headers = {
@@ -112,5 +111,4 @@ class FeishuBot:
             "content": json.dumps(msg),
             "msg_type": type,
         }
-        return self.post('/im/v1/messages',headers=headers,params=params,json=payload)
-    
+        return self.post('/im/v1/messages', headers=headers, params=params, json=payload)
